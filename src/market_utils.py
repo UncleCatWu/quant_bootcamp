@@ -1,3 +1,5 @@
+import pandas as pd
+
 # 累计总收益率 = (最后价格 / 第一个价格) - 1
 def get_total_return(first_price, last_price):
     return (last_price / first_price) - 1
@@ -53,6 +55,10 @@ def get_volatility_label(price_range):
         return "波动较小"
     
 def analyze_prices(prices):
+    
+    if len(prices) == 0:
+        raise ValueError("prices 不能为空")
+    
     first_price = prices[0]
     last_price = prices[-1]
 
@@ -79,3 +85,11 @@ def analyze_prices(prices):
         "trend_label": trend_label,
         "volatility_label": volatility_label,
     }
+    
+def load_prices_from_csv(file_path):
+    df = pd.read_csv(file_path)
+    return df["close"].tolist()
+
+
+def load_dataframe_from_csv(file_path):
+    return pd.read_csv(file_path)
