@@ -93,3 +93,43 @@ def load_prices_from_csv(file_path):
 
 def load_dataframe_from_csv(file_path):
     return pd.read_csv(file_path)
+
+
+def add_return_column(df):
+    df = df.copy()
+    df["return"] = df["close"].pct_change()
+    return df
+
+
+def add_moving_average(df, window):
+    df = df.copy()
+    df[f"ma_{window}"] = df["close"].rolling(window).mean()
+    return df
+
+
+def add_basic_features(df):
+    df = add_return_column(df)
+    df = add_moving_average(df, 3)
+    df = add_moving_average(df, 5)
+    return df
+
+
+def get_latest_row(df):
+    return df.iloc[-1]
+
+
+def get_latest_signal(df):
+    latest = get_latest_row(df)
+
+    ma_3 = latest["ma_3"]
+    ma_5 = latest["ma_5"]
+
+    if pd.isna(ma_3) or pd.isna(ma_5):
+        return "均线数据不足"
+
+    if ma_3 > ma_5:
+        return "短期偏强"
+    elif ma_3 < ma_5:
+        return "短期偏弱"
+    else:
+        return "短期中性"
