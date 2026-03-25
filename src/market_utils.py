@@ -1,27 +1,63 @@
 import pandas as pd
 
 
+# 读取指定路径的 CSV 文件，并返回 pandas DataFrame。
+# 这个函数适合在后续需要继续对整张表做特征加工时使用。
+# 参数：
+# - file_path: CSV 文件路径，字符串类型。
+# 返回：
+# - pandas.DataFrame，包含 CSV 中的全部列数据。
 def load_dataframe_from_csv(file_path):
     return pd.read_csv(file_path)
 
 
+# 从 CSV 文件中读取 close 列，并转换为普通 Python 列表。
+# 这个函数适合在只关心价格序列、准备交给纯 Python 分析函数时使用。
+# 参数：
+# - file_path: CSV 文件路径，字符串类型。
+# 返回：
+# - list，收盘价序列。
 def load_prices_from_csv(file_path):
     df = pd.read_csv(file_path)
     return df["close"].tolist()
 
 
+# 给 DataFrame 增加收益率列 return。
+# pct_change() 会计算当前行相对于上一行的百分比变化。
+# 第一行由于没有前一行可比较，因此结果会是 NaN。
+# 参数：
+# - df: 原始行情 DataFrame，必须包含 close 列。
+# 返回：
+# - 新的 DataFrame 副本，包含新增的 return 列。
 def add_return_column(df):
     df = df.copy()
     df["return"] = df["close"].pct_change()
     return df
 
 
+# 给 DataFrame 增加移动平均线列，例如 ma_3、ma_5。
+# rolling(window).mean() 表示对 close 列做滚动窗口平均。
+# 前 window-1 行由于数据不足，会得到 NaN。
+# 参数：
+# - df: 原始行情 DataFrame，必须包含 close 列。
+# - window: 均线窗口大小，例如 3、5、10。
+# 返回：
+# - 新的 DataFrame 副本，包含新增的均线列。
 def add_moving_average(df, window):
     df = df.copy()
     df[f"ma_{window}"] = df["close"].rolling(window).mean()
     return df
 
 
+# 给 DataFrame 一次性增加最基础的量化特征列。
+# 当前版本会增加：
+# - return: 日收益率
+# - ma_3: 3 日均线
+# - ma_5: 5 日均线
+# 参数：
+# - df: 原始行情 DataFrame。
+# 返回：
+# - 加工后的 DataFrame。
 def add_basic_features(df):
     df = add_return_column(df)
     df = add_moving_average(df, 3)
@@ -29,22 +65,53 @@ def add_basic_features(df):
     return df
 
 
+# 计算累计收益率。
+# 公式为：(最终价格 / 初始价格) - 1。
+# 参数：
+# - first_price: 初始价格。
+# - last_price: 最终价格。
+# 返回：
+# - float，累计收益率。
 def get_total_return(first_price, last_price):
     return (last_price / first_price) - 1
 
 
+# 计算价格序列的平均价格。
+# 参数：
+# - prices: 价格列表。
+# 返回：
+# - float，平均价格。
 def get_average_price(prices):
     return sum(prices) / len(prices)
 
 
+# 获取价格序列中的最高价。
+# 参数：
+# - prices: 价格列表。
+# 返回：
+# - 数值类型，序列中的最大值。
 def get_highest_price(prices):
     return max(prices)
 
 
+# 获取价格序列中的最低价。
+# 参数：
+# - prices: 价格列表。
+# 返回：
+# - 数值类型，序列中的最小值。
 def get_lowest_price(prices):
     return min(prices)
 
 
+# 统计价格序列中上涨、下跌、平盘的天数。
+# 逻辑是从第二个价格开始，与前一天价格逐一比较：
+# - 当前价格 > 前一天价格：上涨天数加 1
+# - 当前价格 < 前一天价格：下跌天数加 1
+# - 当前价格 == 前一天价格：平盘天数加 1
+# 参数：
+# - prices: 价格列表。
+# 返回：
+# - (up_days, down_days, flat_days) 三元组。
 def count_up_down_flat_days(prices):
     up_days = 0
     down_days = 0
@@ -64,10 +131,21 @@ def count_up_down_flat_days(prices):
     return up_days, down_days, flat_days
 
 
+# 计算价格区间，也就是最高价减去最低价。
+# 可以用来粗略衡量这段时间的绝对波动幅度。
+# 参数：
+# - prices: 价格列表。
+# 返回：
+# - 数值类型，价格区间。
 def get_price_range(prices):
     return max(prices) - min(prices)
 
 
+# 根据累计收益率给出趋势文字标签。
+# 参数：
+# - total_return: 累计收益率。
+# 返回：
+# - str，趋势描述。
 def get_trend_label(total_return):
     if total_return > 0:
         return "这段时间整体上涨"
@@ -77,6 +155,14 @@ def get_trend_label(total_return):
         return "这段时间整体平盘"
 
 
+# 根据价格区间给出一个非常粗略的波动标签。
+# 当前规则：
+# - price_range >= 10: 波动较大
+# - 否则: 波动较小
+# 参数：
+# - price_range: 价格区间。
+# 返回：
+# - str，波动描述。
 def get_volatility_label(price_range):
     if price_range >= 10:
         return "波动较大"
@@ -84,6 +170,20 @@ def get_volatility_label(price_range):
         return "波动较小"
 
 
+# 对价格序列做综合分析，并返回结构化结果。
+# 这个函数会统一调用前面已经写好的小函数，计算：
+# - 起始价格、结束价格
+# - 累计收益率
+# - 平均价格
+# - 最高价、最低价
+# - 上涨/下跌/平盘天数
+# - 价格区间
+# - 趋势标签
+# - 波动标签
+# 参数：
+# - prices: 价格列表，不能为空。
+# 返回：
+# - dict，包含完整分析结果。
 def analyze_prices(prices):
     if len(prices) == 0:
         raise ValueError("prices 不能为空")
@@ -116,10 +216,26 @@ def analyze_prices(prices):
     }
 
 
+# 获取 DataFrame 的最后一行。
+# 常用于读取最新一天的行情或特征值。
+# 参数：
+# - df: pandas.DataFrame。
+# 返回：
+# - pandas.Series，最后一行数据。
 def get_latest_row(df):
     return df.iloc[-1]
 
 
+# 根据最新一行的短周期均线和长周期均线，给出一个简单的均线信号。
+# 当前规则：
+# - ma_3 > ma_5: 短期偏强
+# - ma_3 < ma_5: 短期偏弱
+# - ma_3 == ma_5: 短期中性
+# 如果均线数据还不完整（出现 NaN），则返回“均线数据不足”。
+# 参数：
+# - df: 已经包含 ma_3 和 ma_5 列的 DataFrame。
+# 返回：
+# - str，均线信号描述。
 def get_latest_signal(df):
     latest = get_latest_row(df)
 
@@ -137,6 +253,20 @@ def get_latest_signal(df):
         return "短期中性"
 
 
+# 从单只股票的 CSV 文件出发，完成整条分析链路。
+# 这个函数会：
+# 1. 读取 CSV 为 DataFrame
+# 2. 增加基础特征列
+# 3. 提取 close 价格序列
+# 4. 对价格序列做统计分析
+# 5. 计算最新均线信号
+# 6. 返回一份完整报告字典
+# 参数：
+# - ticker: 股票代码，例如 AAPL、TSLA、CATL。
+# - file_path: 对应 CSV 文件路径。
+# - market: 市场代码，默认是 "US"。
+# 返回：
+# - dict，包含股票基本信息、DataFrame、统计摘要和最新信号。
 def analyze_stock_from_csv(ticker, file_path, market="US"):
     df = load_dataframe_from_csv(file_path)
     df = add_basic_features(df)
@@ -155,6 +285,12 @@ def analyze_stock_from_csv(ticker, file_path, market="US"):
     }
 
 
+# 把完整报告压缩为一行摘要数据，便于构建汇总表。
+# 这个函数适合在批量分析多只股票后，生成 DataFrame 总表。
+# 参数：
+# - report: analyze_stock_from_csv 返回的完整报告字典。
+# 返回：
+# - dict，一行摘要数据。
 def build_summary_row(report):
     summary = report["summary"]
     df = report["dataframe"]
@@ -171,6 +307,12 @@ def build_summary_row(report):
     }
 
 
+# 打印单只股票的完整市场报告。
+# 这个函数负责把结构化结果格式化输出到终端，便于人工阅读。
+# 参数：
+# - report: analyze_stock_from_csv 返回的完整报告字典。
+# 返回：
+# - 无返回值，直接打印。
 def print_market_report(report):
     summary = report["summary"]
     df = report["dataframe"]
