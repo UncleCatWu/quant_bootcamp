@@ -420,3 +420,95 @@ def print_market_report(report):
     print("最新 3 日均线:", round(df.iloc[-1]["ma_3"], 2))
     print("最新 5 日均线:", round(df.iloc[-1]["ma_5"], 2))
     print("均线信号:", report["latest_signal"])
+    
+def add_signal_column(df):
+    """根据 ma_3 和 ma_5 生成基础信号列。
+
+    规则：
+        - 当 ma_3 > ma_5 时，signal = 1
+        - 其他情况，signal = 0
+
+    Args:
+        df (pandas.DataFrame): 已包含 ma_3 和 ma_5 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 signal 列。
+    """
+    df = df.copy()
+    df["signal"] = 0
+    df.loc[df["ma_3"] > df["ma_5"], "signal"] = 1
+    return df
+
+def add_position_column(df):
+    """根据信号列生成持仓列。
+
+    规则：
+        使用前一天的 signal 作为今天的实际持仓，
+        以避免使用未来信息。
+
+    Args:
+        df (pandas.DataFrame): 已包含 signal 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 position 列。
+    """
+    df = df.copy()
+    df["position"] = df["signal"].shift(1)
+    return df
+
+def add_strategy_return_column(df):
+    """根据持仓列和市场收益率列生成策略收益列。
+
+    规则：
+        strategy_return = position * return
+
+    Args:
+        df (pandas.DataFrame): 已包含 position 和 return 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 strategy_return 列。
+    """
+    df = df.copy()
+    df["strategy_return"] = df["position"] * df["return"]
+    return df
+
+def add_cumulative_return_columns(df):
+    """增加市场净值列和策略净值列。
+
+    新增列：
+        - cum_return: 市场买入持有净值
+        - strategy_cum_return: 策略累计净值
+
+    Args:
+        df (pandas.DataFrame): 已包含 return 和 strategy_return 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含累计净值列。
+    """
+    df = df.copy()
+    df["cum_return"] = (1 + df["return"]).cumprod()
+    df["strategy_cum_return"] = (1 + df["strategy_return"]).cumprod()
+    return df
+
+def build_strategy_dataframe(df):
+    """基于价格数据构建最基础的策略研究表。
+
+    执行步骤：
+        1. 增加 return、ma_3、ma_5
+        2. 生成 signal
+        3. 生成 position
+        4. 生成 strategy_return
+        5. 生成累计净值列
+
+    Args:
+        df (pandas.DataFrame): 原始行情表，至少包含 close 列。
+
+    Returns:
+        pandas.DataFrame: 包含特征、信号、持仓、收益、净值的完整策略表。
+    """
+    df = add_basic_features(df)
+    df = add_signal_column(df)
+    df = add_position_column(df)
+    df = add_strategy_return_column(df)
+    df = add_cumulative_return_columns(df)
+    return df
