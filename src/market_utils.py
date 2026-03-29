@@ -591,3 +591,91 @@ def evaluate_strategy(df):
         "strategy_max_drawdown": strategy_max_drawdown,
         "strategy_beats_market": strategy_total_return > market_total_return,
     }
+    
+def add_position_change_column(df):
+    """增加仓位变化列。
+
+    position_change 用来表示今天是否发生了仓位调整。
+    在当前简单策略中：
+        - 0 -> 1 表示开仓
+        - 1 -> 0 表示平仓
+        - 0 -> 0 或 1 -> 1 表示无交易
+
+    Args:
+        df (pandas.DataFrame): 已包含 position 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 position_change 列。
+    """
+    df = df.copy()
+    df["position_change"] = df["position"].diff().abs()
+    return df
+
+def add_cost_column(df, cost_rate=0.001):
+    """增加交易成本列。
+
+    当前简单模型中，成本 = 仓位变化 * cost_rate。
+
+    Args:
+        df (pandas.DataFrame): 已包含 position_change 列的数据表。
+        cost_rate (float, optional): 单次仓位变化成本率，默认 0.001，即 0.1%。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 cost 列。
+    """
+    df = df.copy()
+    df["cost"] = df["position_change"] * cost_rate
+    return df
+
+def add_strategy_return_after_cost_column(df):
+    """增加扣成本后的策略收益列。
+
+    计算逻辑：
+        strategy_return_after_cost = strategy_return - cost
+
+    Args:
+        df (pandas.DataFrame): 已包含 strategy_return 和 cost 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 strategy_return_after_cost 列。
+    """
+    df = df.copy()
+    df["strategy_return_after_cost"] = df["strategy_return"] - df["cost"]
+    return df
+
+def add_strategy_cum_return_after_cost_column(df):
+    """增加扣成本后的策略累计净值列。
+
+    Args:
+        df (pandas.DataFrame): 已包含 strategy_return_after_cost 列的数据表。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 strategy_cum_return_after_cost 列。
+    """
+    df = df.copy()
+    df["strategy_cum_return_after_cost"] = (1 + df["strategy_return_after_cost"]).cumprod()
+    return df
+
+def build_strategy_dataframe_with_cost(df, cost_rate=0.001):
+    """构建包含交易成本的完整策略研究表。
+
+    执行步骤：
+        1. 构建基础策略表
+        2. 增加仓位变化列
+        3. 增加成本列
+        4. 增加扣成本后的策略收益列
+        5. 增加扣成本后的策略累计净值列
+
+    Args:
+        df (pandas.DataFrame): 原始行情表。
+        cost_rate (float, optional): 单次交易成本率，默认 0.001。
+
+    Returns:
+        pandas.DataFrame: 包含交易成本影响的完整策略表。
+    """
+    df = build_strategy_dataframe(df)
+    df = add_position_change_column(df)
+    df = add_cost_column(df, cost_rate=cost_rate)
+    df = add_strategy_return_after_cost_column(df)
+    df = add_strategy_cum_return_after_cost_column(df)
+    return df
