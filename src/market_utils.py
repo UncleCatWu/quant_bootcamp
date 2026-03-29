@@ -512,3 +512,82 @@ def build_strategy_dataframe(df):
     df = add_strategy_return_column(df)
     df = add_cumulative_return_columns(df)
     return df
+
+def get_total_market_return(df):
+    """获取市场总收益。
+
+    Args:
+        df (pandas.DataFrame): 已包含 cum_return 列的数据表。
+
+    Returns:
+        float: 市场总收益率。
+    """
+    return df["cum_return"].iloc[-1] - 1
+
+def get_total_strategy_return(df):
+    """获取策略总收益。
+
+    Args:
+        df (pandas.DataFrame): 已包含 strategy_cum_return 列的数据表。
+
+    Returns:
+        float: 策略总收益率。
+    """
+    return df["strategy_cum_return"].iloc[-1] - 1
+
+def get_strategy_win_rate(df):
+    """计算策略日胜率。
+
+    这里先按 strategy_return > 0 的天数占有效策略收益天数的比例计算。
+
+    Args:
+        df (pandas.DataFrame): 已包含 strategy_return 列的数据表。
+
+    Returns:
+        float: 胜率；如果没有有效交易日，则返回 0。
+    """
+    strategy_returns = df["strategy_return"].dropna()
+    strategy_returns = strategy_returns[strategy_returns != 0]
+
+    if len(strategy_returns) == 0:
+        return 0
+
+    win_days = (strategy_returns > 0).sum()
+    return win_days / len(strategy_returns)
+
+def get_max_drawdown(cum_series):
+    """计算最大回撤。
+
+    Args:
+        cum_series (pandas.Series): 净值序列。
+
+    Returns:
+        float: 最大回撤，通常是一个小于等于 0 的值。
+    """
+    running_max = cum_series.cummax()
+    drawdown = cum_series / running_max - 1
+    return drawdown.min()
+
+def evaluate_strategy(df):
+    """对策略进行基础绩效评估。
+
+    Args:
+        df (pandas.DataFrame): 已包含净值列和策略收益列的数据表。
+
+    Returns:
+        dict: 基础绩效评估结果。
+    """
+    market_total_return = get_total_market_return(df)
+    strategy_total_return = get_total_strategy_return(df)
+    win_rate = get_strategy_win_rate(df)
+    market_max_drawdown = get_max_drawdown(df["cum_return"].dropna())
+    strategy_max_drawdown = get_max_drawdown(df["strategy_cum_return"].dropna())
+
+    return {
+        "market_total_return": market_total_return,
+        "strategy_total_return": strategy_total_return,
+        "win_rate": win_rate,
+        "market_max_drawdown": market_max_drawdown,
+        "strategy_max_drawdown": strategy_max_drawdown,
+        "strategy_beats_market": strategy_total_return > market_total_return,
+    }
