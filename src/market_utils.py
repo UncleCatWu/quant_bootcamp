@@ -760,3 +760,56 @@ def build_ma_strategy_dataframe_with_cost(df, short_window, long_window, cost_ra
     df = add_strategy_cum_return_after_cost_column(df)
     return df
 
+def summarize_ma_strategy(df, short_window, long_window):
+    """汇总单组均线参数策略表现。
+
+    Args:
+        df (pandas.DataFrame): 原始行情表。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+
+    Returns:
+        dict: 单组参数的策略表现摘要。
+    """
+    strategy_df = build_ma_strategy_dataframe(df, short_window, long_window)
+
+    market_final = strategy_df["cum_return"].dropna().iloc[-1]
+    strategy_final = strategy_df["strategy_cum_return"].dropna().iloc[-1]
+
+    return {
+        "short_window": short_window,
+        "long_window": long_window,
+        "market_return_pct": (market_final - 1) * 100,
+        "strategy_return_pct": (strategy_final - 1) * 100,
+    }
+    
+def summarize_ma_strategy_with_cost(df, short_window, long_window, cost_rate=0.001):
+    """汇总单组均线参数策略表现（含交易成本）。
+
+    Args:
+        df (pandas.DataFrame): 原始行情表。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+        cost_rate (float, optional): 交易成本率。
+
+    Returns:
+        dict: 单组参数的策略表现摘要。
+    """
+    strategy_df = build_ma_strategy_dataframe_with_cost(
+        df,
+        short_window=short_window,
+        long_window=long_window,
+        cost_rate=cost_rate,
+    )
+
+    market_final = strategy_df["cum_return"].dropna().iloc[-1]
+    strategy_final = strategy_df["strategy_cum_return"].dropna().iloc[-1]
+    strategy_after_cost_final = strategy_df["strategy_cum_return_after_cost"].dropna().iloc[-1]
+
+    return {
+        "short_window": short_window,
+        "long_window": long_window,
+        "market_return_pct": (market_final - 1) * 100,
+        "strategy_return_pct": (strategy_final - 1) * 100,
+        "strategy_return_after_cost_pct": (strategy_after_cost_final - 1) * 100,
+    }
