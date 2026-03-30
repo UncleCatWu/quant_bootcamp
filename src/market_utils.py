@@ -679,3 +679,84 @@ def build_strategy_dataframe_with_cost(df, cost_rate=0.001):
     df = add_strategy_return_after_cost_column(df)
     df = add_strategy_cum_return_after_cost_column(df)
     return df
+
+def add_ma_features(df, short_window, long_window):
+    """增加自定义短均线和长均线列。
+
+    Args:
+        df (pandas.DataFrame): 原始行情表，必须包含 close 列。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 return、短均线、长均线。
+    """
+    df = df.copy()
+    df["return"] = df["close"].pct_change()
+    df[f"ma_{short_window}"] = df["close"].rolling(short_window).mean()
+    df[f"ma_{long_window}"] = df["close"].rolling(long_window).mean()
+    return df
+
+def add_ma_signal_column(df, short_window, long_window):
+    """根据自定义短均线和长均线生成信号列。
+
+    规则：
+        - 当短均线 > 长均线时，signal = 1
+        - 否则 signal = 0
+
+    Args:
+        df (pandas.DataFrame): 已包含对应均线列的数据表。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+
+    Returns:
+        pandas.DataFrame: 新的 DataFrame 副本，包含 signal 列。
+    """
+    df = df.copy()
+    short_col = f"ma_{short_window}"
+    long_col = f"ma_{long_window}"
+
+    df["signal"] = 0
+    df.loc[df[short_col] > df[long_col], "signal"] = 1
+    return df
+
+def build_ma_strategy_dataframe(df, short_window, long_window):
+    """构建自定义均线参数的策略研究表。
+
+    Args:
+        df (pandas.DataFrame): 原始行情表，至少包含 close 列。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+
+    Returns:
+        pandas.DataFrame: 完整策略表。
+    """
+    if short_window >= long_window:
+        raise ValueError("short_window 必须小于 long_window")
+
+    df = add_ma_features(df, short_window, long_window)
+    df = add_ma_signal_column(df, short_window, long_window)
+    df = add_position_column(df)
+    df = add_strategy_return_column(df)
+    df = add_cumulative_return_columns(df)
+    return df
+
+def build_ma_strategy_dataframe_with_cost(df, short_window, long_window, cost_rate=0.001):
+    """构建包含交易成本的自定义均线参数策略表。
+
+    Args:
+        df (pandas.DataFrame): 原始行情表。
+        short_window (int): 短均线窗口。
+        long_window (int): 长均线窗口。
+        cost_rate (float, optional): 交易成本率。
+
+    Returns:
+        pandas.DataFrame: 包含交易成本影响的完整策略表。
+    """
+    df = build_ma_strategy_dataframe(df, short_window, long_window)
+    df = add_position_change_column(df)
+    df = add_cost_column(df, cost_rate=cost_rate)
+    df = add_strategy_return_after_cost_column(df)
+    df = add_strategy_cum_return_after_cost_column(df)
+    return df
+
